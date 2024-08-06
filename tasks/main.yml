@@ -1,0 +1,100 @@
+---
+
+- name: Set Debian defaults
+  set_fact:
+    acmesh_home: /var/lib/acmesh
+    apache_conf_dir: /etc/apache2/conf-available/
+    etc_prefix: ''
+  when: ansible_os_family == "Debian"
+
+- name: Set FreeBSD defaults
+  set_fact:
+    acmesh_home: /var/db/acmesh
+    apache_conf_dir: /usr/local/etc/apache24/Includes/
+    etc_prefix: /usr/local
+  when: ansible_os_family == "FreeBSD"
+
+- name: Add user acmesh
+  user:
+    name: acmesh
+    system: yes
+    home: '{{ acmesh_home }}'
+    shell: /bin/false
+#    groups: www-data
+
+- name: Create {{ acmesh_home }}/tmp/.well-known/acme-challenge
+  file:
+    path: "{{ acmesh_home }}/tmp/.well-known/acme-challenge"
+    owner: acmesh
+    group: acmesh
+    state: directory
+
+- stat:
+    path: "{{ etc_prefix }}/etc/nginx/conf.d"
+  register: nginx_conf
+
+- name: Copy local-mit-acmesh.include (nginx)
+  template:
+    src: local-mit-acmesh.include
+    dest: "{{ etc_prefix }}/etc/nginx/conf.d"
+  when: nginx_conf.stat.exists
+
+- stat:
+    path: "{{ apache_conf_dir }}"
+  register: apache_conf
+- stat:
+    path: /usr/sbin/a2enconf
+  register: a2enconf
+- name: Copy local-mit-acme.sh.conf (apache)
+  template:
+    src: local-mit-acme.sh.conf
+    dest: "{{ apache_conf_dir }}"
+  when: apache_conf.stat.exists
+- name: Enable local-mit-acme.sh.conf (apache)
+  command: a2enconf local-mit-acme.sh
+  when: a2enconf.stat.exists
+
+- name: Allow execution of service commands via sudo
+  copy:
+    src: local-mit-acmesh
+    dest: "{{ etc_prefix }}/etc/sudoers.d/"
+    mode: 0440
+    validate: 'visudo -cf %s'
+
+- name: Set MAILTO in crontab
+  ansible.builtin.cron:
+    env: yes
+    name: MAILTO
+    job: "{{ acmesh_crontab_mailto }}"
+    user: acmesh
+
+- name: Gather the package facts
+  ansible.builtin.package_facts:
+    manager: auto
+  when: ansible_facts.packages is not defined
+
+- name: Logcheck rules
+  # The file has to be named "local", either "a", "0-mit-zabbix-agent-check-upgrades"
+  # or "mit-zabbix-agent-check-upgrades" do not work. Test with:
+  # sudo -u logcheck logcheck -o -t -d -l /var/log/auth.log
+  lineinfile:
+    create: yes
+    path: /etc/logcheck/violations.ignore.d/local
+    line: '^\w{3} [ :0-9]{11} [._[:alnum:]-]+ sudo:   acmesh : PWD=\/var\/lib\/acmesh\/\.acme\.sh\/[a-z0-9\-\.]+ ; USER=root ; COMMAND=\/usr\/sbin\/service (apache2|nginx|postfix) reload$'
+  when: "'logcheck' in ansible_facts.packages and ansible_distribution == 'Debian' and ansible_distribution_major_version|int == 11"
+
+- name: Check deprecated files (apache)
+  command: ls /etc/apache2/conf-available/local-acme.sh.conf
+  register: cmd_ls
+  failed_when: cmd_ls.rc == 0
+  changed_when: no
+  when: apache_conf.stat.exists
+
+# sudo sed -i 's/conf.d\/mit-acmesh.include/conf.d\/local-mit-acmesh.include/g' server-*.conf
+- name: Check deprecated files (nginx)
+  command: ls {{ etc_prefix }}/etc/nginx/conf.d/mit-acmesh.include
+  register: cmd_ls
+  failed_when: cmd_ls.rc == 0
+  changed_when: no
+  when: nginx_conf.stat.exists
+

@@ -15,6 +15,7 @@ sudo -u acmesh -s
 cd && git clone https://github.com/Neilpang/acme.sh.git && cd ./acme.sh && ./acme.sh --install
 # Add `source /var/db/acmesh/.acme.sh/acme.sh.env` to `~/.config/fish/config.fish`
 acme.sh --upgrade --auto-upgrade
+```
 
 Switch default CA:
 

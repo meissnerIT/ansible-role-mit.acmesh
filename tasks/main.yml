@@ -1,11 +1,10 @@
 ---
-
 - name: Set Debian defaults
   set_fact:
     acmesh_home: /var/lib/acmesh
     apache_conf_dir: /etc/apache2/conf-available/
-    etc_prefix: ''
-  when: ansible_os_family == "Debian"
+    etc_prefix: ""
+  when: ansible_os_family == "Debian" or ansible_os_family == "Univention Corporate Server"
 
 - name: Set FreeBSD defaults
   set_fact:
@@ -18,7 +17,7 @@
   user:
     name: acmesh
     system: yes
-    home: '{{ acmesh_home }}'
+    home: "{{ acmesh_home }}"
     shell: /bin/false
 #    groups: www-data
 
@@ -59,7 +58,7 @@
     src: local-mit-acmesh
     dest: "{{ etc_prefix }}/etc/sudoers.d/"
     mode: 0440
-    validate: 'visudo -cf %s'
+    validate: "visudo -cf %s"
 
 - name: Set MAILTO in crontab
   ansible.builtin.cron:
@@ -97,4 +96,3 @@
   failed_when: cmd_ls.rc == 0
   changed_when: no
   when: nginx_conf.stat.exists
-

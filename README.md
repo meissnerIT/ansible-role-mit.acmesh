@@ -1,9 +1,11 @@
+# ansible role mit.acme
+
 ## Install
 
 Using bash:
 
 ```sh
-sudo su -s /bin/bash -l acmesh
+sudo su -s $(which bash) -l acmesh
 cd && git clone https://github.com/Neilpang/acme.sh.git && cd ./acme.sh && ./acme.sh --install
 acme.sh --upgrade --auto-upgrade
 ```
@@ -11,9 +13,9 @@ acme.sh --upgrade --auto-upgrade
 Using fish:
 
 ```sh
-sudo -u acmesh -s
+sudo su -s $(which fish) -l acmesh
 cd && git clone https://github.com/Neilpang/acme.sh.git && cd ./acme.sh && ./acme.sh --install
-# Add `source /var/db/acmesh/.acme.sh/acme.sh.env` to `~/.config/fish/config.fish`
+# Add `source ~/.acme.sh/acme.sh.env` to `~/.config/fish/config.fish`
 acme.sh --upgrade --auto-upgrade
 ```
 
@@ -34,7 +36,7 @@ to nginx-server configuration for port 80.
 Add
 `Alias /.well-known/acme-challenge /var/lib/acmesh/tmp/.well-known/acme-challenge`
 to apache configuration for port 80. If you need a redirect you have to use
-`RedirectMatch "^/$" "https://autoconfig.osmx.eu/"`
+`RedirectMatch "^/$" "https://www.my.dom/"`
 or
 
 ```
@@ -47,12 +49,16 @@ or
 instead of only `Redirect / ...`!
 
 ```sh
-acme.sh --issue -w ~/tmp --reloadcmd "sudo service nginx reload" -d db3-admin.meissner.it
+acme.sh --issue -w ~/tmp --reloadcmd "sudo service nginx reload" -d www.example.com
+acme.sh --install-cert -d www.example.com \
+    --key-file       /path/to/keyfile/in/nginx/key.pem  \
+    --fullchain-file /path/to/fullchain/nginx/cert.pem \
+    --reloadcmd      "sudo service nginx reload"
 ```
 
 ```sh
-acme.sh --issue -w ~/tmp --reloadcmd "sudo service apache2 reload" -d db3-admin.meissner.it
+acme.sh --issue -w ~/tmp --reloadcmd "sudo service apache2 reload" -d www.my.dom
 ```
 
-The `--reloadcmd` parameter leads to the following config entry:  
-`Le_ReloadCmd='sudo service apache2 reload`
+The `--reloadcmd` parameter leads to the config entry
+`Le_ReloadCmd='__ACME_BASE64__START_...'`, so you won't find it easily.
